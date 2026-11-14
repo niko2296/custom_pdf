@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# SIBA PDF - Native macOS Application Launcher
+# ==============================================================================
+
+DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$DIR"
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+if command -v python3 &>/dev/null; then
+    PY="python3"
+elif command -v python &>/dev/null; then
+    PY="python"
+elif [ -f "/opt/homebrew/bin/python3" ]; then
+    PY="/opt/homebrew/bin/python3"
+elif [ -f "/usr/local/bin/python3" ]; then
+    PY="/usr/local/bin/python3"
+else
+    open "$DIR/SIBA_PDF_PORTABLE.html" &>/dev/null || open "SIBA_PDF_PORTABLE.html" &>/dev/null
+    exit 0
+fi
+
+if [ ! -d ".venv" ]; then
+    "$PY" -m venv .venv 2>/dev/null || true
+fi
+
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+fi
+
+if ! python -c "import pymupdf, fastapi, uvicorn, PIL" &>/dev/null; then
+    pip install -r requirements.txt || pip install --break-system-packages -r requirements.txt || true
+fi
+
+(sleep 1.2 && open "http://127.0.0.1:5050") &
+
+exec python execution/server.py

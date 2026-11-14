@@ -1,0 +1,52 @@
+================================================================================
+SIBA SURYA PDF SUITE — PANDUAN MENJALANKAN DI MACBOOK (macOS)
+================================================================================
+
+Tersedia 2 Pilihan Praktis untuk menjalankan SIBA PDF di MacBook Anda:
+
+--------------------------------------------------------------------------------
+CARA 1: INSTAN & PORTABLE (SANGAT DIREKOMENDASIKAN — TANPA INSTALL APAPUN)
+--------------------------------------------------------------------------------
+1. Temukan file bernama:
+   >> SIBA_PDF_PORTABLE.html <<
+
+2. Cukup klik ganda (double-click) file tersebut di Finder MacBook.
+3. Aplikasi langsung terbuka dan aktif di Safari / Google Chrome!
+   - 100% Offline & Aman (berjalan di memori MacBook).
+   - Dilengkapi Kompres Target Ukuran (KB/MB), Gabung, Pisah, Putar, Konversi.
+   - Dilengkapi tombol floating "Unlock PRO" di kanan bawah (Key: 1507) 
+     yang membuka tab merah mengkilat "Make Any PDF Editable", edit teks hasil scan,
+     tambah teks, dan sisipkan gambar dari PC/Mac Anda!
+   - Bebas kendala izin (permission), port, atau Python.
+
+--------------------------------------------------------------------------------
+CARA 2: MENGGUNAKAN SERVER PYTHON LOKAL (PyMuPDF Engine)
+--------------------------------------------------------------------------------
+Jika Anda ingin menjalankan backend server Python lokal:
+
+PILIHAN A (Klik Ganda):
+- Klik ganda file "Buka_SIBA_PDF.command".
+- Browser akan otomatis terbuka di http://127.0.0.1:5050.
+
+PILIHAN B (Jika Muncul Pesan "access privileges" / "tidak memiliki izin"):
+Ini terjadi saat file dicopy dari Windows ke Mac karena sistem Windows tidak 
+menyimpan atribut executable Linux/macOS. Solusinya sangat mudah (hanya 1 detik):
+1. Buka aplikasi "Terminal" di MacBook (bisa dicari via Spotlight: Cmd + Spasi -> Terminal).
+2. Geser (drag & drop) folder "SIBA PDF THINGS" ke jendela Terminal, atau ketik:
+   cd "folder-tempat-file-ini-berada"
+3. Ketik perintah ini lalu tekan Enter:
+   bash run.sh
+
+Aplikasi akan otomatis menginstal library yang diperlukan dan membuka browser 
+di http://127.0.0.1:5050!
+
+================================================================================
+KODE KUNCI UNLOCK PRO: 1507
+================================================================================
+- Klik tombol "Unlock PRO" di kanan bawah layar.
+- Masukkan angka: 1507
+- Tab "PRO Editor" berwarna merah mengkilat akan terbuka di menu navigasi.
+- Sesuai standar keamanan, mode PRO disimpan di memori (akan terkunci kembali jika
+  halaman ditutup atau di-refresh).
+================================================================================
+
