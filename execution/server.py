@@ -5,6 +5,8 @@ Part of the 3-Layer Architecture (Layer 3: Deterministic Execution)
 
 import os
 import sys
+import time
+import asyncio
 import uuid
 import shutil
 import tempfile
@@ -45,6 +47,83 @@ UPLOAD_DIR = TEMP_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR = TEMP_DIR / "outputs"
 OUTPUT_DIR.mkdir(exist_ok=True)
+
+# Auto-cleanup settings
+MAX_TEMP_AGE_SECONDS = 1800 # 30 minutes TTL
+MAX_TEMP_BUDGET_BYTES = 1024 * 1024 * 1024 # 1 GB max disk budget for temporary files
+CLEANUP_INTERVAL_SECONDS = 600 # Run background sweeper every 10 minutes
+
+def clean_expired_temp_files(max_age_seconds: int = MAX_TEMP_AGE_SECONDS, max_budget_bytes: int = MAX_TEMP_BUDGET_BYTES):
+    """
+    Automatically purges temporary files from UPLOAD_DIR and OUTPUT_DIR:
+    1. Removes any files older than max_age_seconds (default 30 mins).
+    2. If total size still exceeds max_budget_bytes (default 1GB), removes oldest files first.
+    """
+    now = time.time()
+    tracked_files = []
+    removed_count = 0
+    removed_bytes = 0
+
+    for target_dir in [UPLOAD_DIR, OUTPUT_DIR]:
+        if not target_dir.exists():
+            continue
+        for entry in list(target_dir.iterdir()):
+            try:
+                if entry.is_file() or entry.is_symlink():
+                    stat = entry.stat()
+                    if (now - stat.st_mtime) > max_age_seconds:
+                        removed_bytes += stat.st_size
+                        entry.unlink(missing_ok=True)
+                        removed_count += 1
+                    else:
+                        tracked_files.append((stat.st_mtime, stat.st_size, entry))
+                elif entry.is_dir():
+                    stat = entry.stat()
+                    if (now - stat.st_mtime) > max_age_seconds:
+                        shutil.rmtree(entry, ignore_errors=True)
+                        removed_count += 1
+            except Exception:
+                pass
+
+    total_size = sum(f[1] for f in tracked_files)
+    if total_size > max_budget_bytes:
+        tracked_files.sort(key=lambda x: x[0])
+        for _, f_size, f_path in tracked_files:
+            if total_size <= (max_budget_bytes * 0.7):
+                break
+            try:
+                if f_path.is_file() or f_path.is_symlink():
+                    f_path.unlink(missing_ok=True)
+                    total_size -= f_size
+                    removed_bytes += f_size
+                    removed_count += 1
+                elif f_path.is_dir():
+                    shutil.rmtree(f_path, ignore_errors=True)
+                    removed_count += 1
+            except Exception:
+                pass
+
+    if removed_count > 0:
+        print(f"[AUTO-CLEANUP] Membersihkan {removed_count} file sementara ({round(removed_bytes / (1024 * 1024), 2)} MB dibebaskan).")
+    return removed_count, removed_bytes
+
+async def background_temp_cleaner_loop():
+    """Background coroutine that periodically sweeps expired temporary files."""
+    while True:
+        try:
+            clean_expired_temp_files()
+        except Exception:
+            pass
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+
+@app.on_event("startup")
+async def on_app_startup():
+    """Run initial cleanup on startup and launch continuous cleaner."""
+    try:
+        clean_expired_temp_files(max_age_seconds=1800)
+    except Exception:
+        pass
+    asyncio.create_task(background_temp_cleaner_loop())
 
 # Mount static files
 static_dir = project_root / "static"
@@ -449,6 +528,20 @@ async def download_file(filename: str):
         filename=display_name,
         media_type="application/octet-stream"
     )
+
+@app.post("/api/admin/clean-temp")
+async def api_admin_clean_temp(force_all: bool = False):
+    """Manual trigger to clean temp files immediately."""
+    max_age = 0 if force_all else MAX_TEMP_AGE_SECONDS
+    budget = 0 if force_all else MAX_TEMP_BUDGET_BYTES
+    count, bytes_freed = clean_expired_temp_files(max_age_seconds=max_age, max_budget_bytes=budget)
+    return {
+        "success": True,
+        "files_removed": count,
+        "bytes_freed": bytes_freed,
+        "mb_freed": round(bytes_freed / (1024 * 1024), 2),
+        "message": f"Berhasil membersihkan {count} file sementara ({round(bytes_freed / (1024 * 1024), 2)} MB)."
+    }
 
 if __name__ == "__main__":
     import webbrowser
