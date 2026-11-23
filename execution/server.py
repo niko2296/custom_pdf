@@ -8,6 +8,7 @@ import sys
 import uuid
 import shutil
 import tempfile
+import zipfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -68,38 +69,113 @@ async def serve_index():
 
 @app.post("/api/compress")
 async def api_compress(
-    file: UploadFile = File(...),
+    files: Optional[List[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),
     mode: str = Form("target_size"), # "target_size" or "preset"
     target_kb: int = Form(500),
     preset: str = Form("recommended")
 ):
     try:
+        upload_files: List[UploadFile] = []
+        if files:
+            upload_files.extend([f for f in files if f.filename])
+        if file and file.filename:
+            if not any(f.filename == file.filename for f in upload_files):
+                upload_files.append(file)
+
+        if not upload_files:
+            return JSONResponse({"success": False, "error": "Tidak ada file PDF yang diunggah."}, status_code=400)
+
         task_id = str(uuid.uuid4())[:8]
-        safe_name = Path(file.filename or "document.pdf").name
-        input_path = UPLOAD_DIR / f"{task_id}_{safe_name}"
-        output_filename = f"compressed_{safe_name}"
-        output_path = OUTPUT_DIR / f"{task_id}_{output_filename}"
-        
-        # Save uploaded file
-        with open(input_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+
+        # Single file compression flow
+        if len(upload_files) == 1:
+            target_file = upload_files[0]
+            safe_name = Path(target_file.filename or "document.pdf").name
+            input_path = UPLOAD_DIR / f"{task_id}_{safe_name}"
+            output_filename = f"compressed_{safe_name}"
+            output_path = OUTPUT_DIR / f"{task_id}_{output_filename}"
             
-        if mode == "target_size":
-            result = compress_pdf_to_target_size(
-                input_pdf_path=str(input_path),
-                target_size_kb=target_kb,
-                output_pdf_path=str(output_path)
-            )
-        else:
-            result = compress_pdf_preset(
-                input_pdf_path=str(input_path),
-                preset=preset,
-                output_pdf_path=str(output_path)
-            )
-            
-        result["download_url"] = f"/api/download/{task_id}_{output_filename}"
-        result["filename"] = output_filename
-        return JSONResponse(result)
+            with open(input_path, "wb") as f:
+                shutil.copyfileobj(target_file.file, f)
+                
+            if mode == "target_size":
+                result = compress_pdf_to_target_size(
+                    input_pdf_path=str(input_path),
+                    target_size_kb=target_kb,
+                    output_pdf_path=str(output_path)
+                )
+            else:
+                result = compress_pdf_preset(
+                    input_pdf_path=str(input_path),
+                    preset=preset,
+                    output_pdf_path=str(output_path)
+                )
+                
+            result["download_url"] = f"/api/download/{task_id}_{output_filename}"
+            result["filename"] = output_filename
+            result["is_zip"] = False
+            return JSONResponse(result)
+
+        # Multiple files compression flow -> packaged into ZIP
+        compressed_items = []
+        total_orig_size = 0
+        total_comp_size = 0
+        all_targets_met = True
+
+        for idx, f_item in enumerate(upload_files):
+            safe_name = Path(f_item.filename or f"doc_{idx}.pdf").name
+            input_path = UPLOAD_DIR / f"{task_id}_{idx}_{safe_name}"
+            output_filename = f"compressed_{safe_name}"
+            output_path = OUTPUT_DIR / f"{task_id}_{idx}_{output_filename}"
+
+            with open(input_path, "wb") as f:
+                shutil.copyfileobj(f_item.file, f)
+
+            if mode == "target_size":
+                res = compress_pdf_to_target_size(
+                    input_pdf_path=str(input_path),
+                    target_size_kb=target_kb,
+                    output_pdf_path=str(output_path)
+                )
+            else:
+                res = compress_pdf_preset(
+                    input_pdf_path=str(input_path),
+                    preset=preset,
+                    output_pdf_path=str(output_path)
+                )
+
+            total_orig_size += res.get("original_size", 0)
+            total_comp_size += res.get("compressed_size", 0)
+            if not res.get("target_met", True):
+                all_targets_met = False
+
+            compressed_items.append((output_path, safe_name))
+
+        zip_filename = "compressed_pdfs.zip"
+        zip_storage_name = f"{task_id}_{zip_filename}"
+        zip_path = OUTPUT_DIR / zip_storage_name
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for out_p, orig_n in compressed_items:
+                arc_name = f"compressed_{orig_n}"
+                zf.write(out_p, arcname=arc_name)
+
+        final_zip_size = os.path.getsize(zip_path)
+        reduction_pct = round(max(0.0, (1.0 - final_zip_size / max(1, total_orig_size)) * 100), 1)
+
+        return JSONResponse({
+            "success": True,
+            "is_zip": True,
+            "total_files": len(upload_files),
+            "original_size": total_orig_size,
+            "compressed_size": final_zip_size,
+            "reduction_pct": reduction_pct,
+            "target_met": all_targets_met,
+            "note": f"Berhasil mengompres {len(upload_files)} file PDF menjadi 1 file ZIP.",
+            "download_url": f"/api/download/{zip_storage_name}",
+            "filename": zip_filename
+        })
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 

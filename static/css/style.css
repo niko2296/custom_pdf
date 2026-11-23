@@ -563,6 +563,12 @@ body.pro-editor-dark-mode #auto-download-toast {
   transform: translateY(0);
 }
 
+#compress-file-list, #merge-file-list {
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 /* File Preview Strip */
 .file-preview {
   display: flex;

@@ -131,46 +131,162 @@ document.addEventListener("DOMContentLoaded", () => {
   const compressProgressText = document.getElementById("compress-progress-text");
   const compressResult = document.getElementById("compress-result");
 
-  let selectedCompressFile = null;
+  const compressListHeader = document.getElementById("compress-list-header");
+  const compressFileCountBadge = document.getElementById("compress-file-count-badge");
+  const compressBtnResetAll = document.getElementById("compress-btn-reset-all");
+  const compressFileList = document.getElementById("compress-file-list");
+
+  let compressFiles = [];
   let currentCompressMode = "target_size"; // "target_size" | "preset"
   let currentPreset = "recommended";
 
-  function handleCompressFile(file) {
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
+  function addCompressFiles(newFiles) {
+    if (!newFiles || newFiles.length === 0) return;
+    let addedCount = 0;
+    Array.from(newFiles).forEach(file => {
+      if (!file.name.toLowerCase().endsWith(".pdf")) return;
+      const exists = compressFiles.some(f => f.name === file.name && f.size === file.size);
+      if (!exists) {
+        compressFiles.push(file);
+        addedCount++;
+      }
+    });
+
+    if (compressFiles.length === 0) {
       alert("Silakan pilih dokumen dengan ekstensi .pdf");
       return;
     }
-    selectedCompressFile = file;
-    compressFileName.textContent = file.name;
-    compressFileSize.textContent = `Ukuran awal: ${formatBytes(file.size)}`;
+
+    renderCompressFileList();
+  }
+
+  function renderCompressFileList() {
+    if (compressFiles.length === 0) {
+      compressDropzone.style.display = "block";
+      if (compressListHeader) compressListHeader.style.display = "none";
+      if (compressFileList) {
+        compressFileList.innerHTML = "";
+        compressFileList.style.display = "none";
+      }
+      if (compressFilePreview) compressFilePreview.style.display = "none";
+      compressOptions.style.display = "none";
+      compressResult.style.display = "none";
+      compressProgress.style.display = "none";
+      if (compressFileInput) compressFileInput.value = "";
+      return;
+    }
 
     compressDropzone.style.display = "none";
-    compressFilePreview.style.display = "flex";
+    if (compressListHeader) {
+      compressListHeader.style.display = "flex";
+      if (compressFileCountBadge) {
+        compressFileCountBadge.textContent = `${compressFiles.length} File`;
+      }
+    }
+
+    if (compressFileList) {
+      compressFileList.innerHTML = "";
+      compressFileList.style.display = "block";
+
+      compressFiles.forEach((file, index) => {
+        const item = document.createElement("div");
+        item.className = "file-preview";
+        item.style.marginTop = "8px";
+        item.innerHTML = `
+          <div class="file-preview-left">
+            <div class="file-icon">
+              <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+            </div>
+            <div>
+              <div class="file-name">${compressFiles.length > 1 ? `${index + 1}. ` : ""}${file.name}</div>
+              <div class="file-size">${formatBytes(file.size)}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-remove-file" title="Hapus file" data-idx="${index}">
+            <svg class="ui-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        `;
+
+        item.querySelector(".btn-remove-file").addEventListener("click", (e) => {
+          e.stopPropagation();
+          compressFiles.splice(index, 1);
+          renderCompressFileList();
+        });
+
+        compressFileList.appendChild(item);
+      });
+    }
+
     compressOptions.style.display = "block";
     compressResult.style.display = "none";
 
-    // Suggest default target (500 KB or 60% of file size)
-    const fileKb = Math.round(file.size / 1024);
-    if (fileKb > 500) {
+    // Update Action Button Text
+    if (btnStartCompress) {
+      if (compressFiles.length > 1) {
+        btnStartCompress.innerHTML = `
+          <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+          Mulai Kompresi Semua PDF (${compressFiles.length} File ➔ ZIP)
+        `;
+      } else {
+        btnStartCompress.innerHTML = `
+          <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 14h6m0 0v6m0-6L3 21"></path>
+            <path d="M20 10h-6m0 0V4m0 6l7-7"></path>
+          </svg>
+          Mulai Kompresi Anti-Pecah
+        `;
+      }
+    }
+
+    // Default target adjustment
+    const avgKb = Math.round(compressFiles.reduce((acc, f) => acc + f.size, 0) / compressFiles.length / 1024);
+    if (avgKb > 500) {
       setTargetKb(500);
     } else {
-      setTargetKb(Math.max(100, Math.round(fileKb * 0.6)));
+      setTargetKb(Math.max(100, Math.round(avgKb * 0.6)));
     }
   }
 
-  setupDropzone(compressDropzone, compressFileInput, (files) => {
-    if (files.length > 0) handleCompressFile(files[0]);
+  function resetCompressList() {
+    compressFiles = [];
+    if (compressFileInput) compressFileInput.value = "";
+    renderCompressFileList();
+  }
+
+  if (compressBtnResetAll) {
+    compressBtnResetAll.addEventListener("click", resetCompressList);
+  }
+  if (compressBtnRemove) {
+    compressBtnRemove.addEventListener("click", resetCompressList);
+  }
+
+  // Keyboard shortcut: Cmd + Option + Backspace (Mac) / Ctrl + Alt + Backspace (Windows) for section-compress
+  document.addEventListener("keydown", (e) => {
+    const compSec = document.getElementById("section-compress");
+    const isCompActive = compSec && (compSec.classList.contains("active") || compSec.style.display === "block" || !compSec.style.display);
+    if (!isCompActive) return;
+    if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) return;
+
+    if ((e.metaKey || e.ctrlKey) && e.altKey && (e.key === "Backspace" || e.key === "Delete")) {
+      e.preventDefault();
+      if (compressFiles.length > 0) {
+        resetCompressList();
+      }
+    }
   });
 
-  compressBtnRemove.addEventListener("click", (e) => {
-    e.stopPropagation();
-    selectedCompressFile = null;
-    compressFileInput.value = "";
-    compressDropzone.style.display = "block";
-    compressFilePreview.style.display = "none";
-    compressOptions.style.display = "none";
-    compressResult.style.display = "none";
-    compressProgress.style.display = "none";
+  setupDropzone(compressDropzone, compressFileInput, (files) => {
+    if (files.length > 0) addCompressFiles(files);
   });
 
   // Switch Target vs Preset Mode
@@ -232,14 +348,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Start Compression (Hybrid: Server API with Client Fallback)
   btnStartCompress.addEventListener("click", async () => {
-    if (!selectedCompressFile) return;
+    if (compressFiles.length === 0) return;
 
     btnStartCompress.disabled = true;
     compressProgress.style.display = "block";
     compressResult.style.display = "none";
 
     const targetKb = parseInt(targetNumInput.value) || 500;
-    if (currentCompressMode === "target_size") {
+    const isMultiple = compressFiles.length > 1;
+
+    if (isMultiple) {
+      compressProgressText.textContent = `Mengompresi ${compressFiles.length} file PDF... (Format unduhan .ZIP)`;
+    } else if (currentCompressMode === "target_size") {
       compressProgressText.textContent = `Mengoptimasi dokumen ke target maksimal ${targetKb} KB...`;
     } else {
       compressProgressText.textContent = `Menjalankan kompresi preset '${currentPreset}'...`;
@@ -249,7 +369,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let serverSuccess = false;
     try {
       const formData = new FormData();
-      formData.append("file", selectedCompressFile);
+      compressFiles.forEach(f => formData.append("files", f));
+      formData.append("file", compressFiles[0]);
       formData.append("mode", currentCompressMode);
       if (currentCompressMode === "target_size") {
         formData.append("target_kb", targetKb);
@@ -278,11 +399,58 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Client-side fallback engine (100% in-browser)
     try {
-      compressProgressText.textContent = "Memproses kompresi langsung di memori browser...";
-      const clientResult = await clientCompressPdf(selectedCompressFile, currentCompressMode, targetKb, currentPreset);
-      btnStartCompress.disabled = false;
-      compressProgress.style.display = "none";
-      displayCompressResult(clientResult);
+      if (!isMultiple) {
+        compressProgressText.textContent = "Memproses kompresi langsung di memori browser...";
+        const clientResult = await clientCompressPdf(compressFiles[0], currentCompressMode, targetKb, currentPreset);
+        btnStartCompress.disabled = false;
+        compressProgress.style.display = "none";
+        displayCompressResult(clientResult);
+      } else {
+        // Multiple files in-browser fallback using JSZip
+        if (typeof JSZip === "undefined") {
+          throw new Error("Library JSZip belum siap untuk membuat file ZIP di browser.");
+        }
+        const zip = new JSZip();
+        let totalOrig = 0;
+        let totalComp = 0;
+        let allMet = true;
+
+        for (let i = 0; i < compressFiles.length; i++) {
+          const f = compressFiles[i];
+          compressProgressText.textContent = `Mengompresi file ${i + 1} dari ${compressFiles.length}: ${f.name}...`;
+          const res = await clientCompressPdf(f, currentCompressMode, targetKb, currentPreset);
+          totalOrig += res.original_size;
+          totalComp += res.compressed_size;
+          if (!res.target_met) allMet = false;
+
+          let fileData = res.bytes;
+          if (!fileData) {
+            fileData = await fetch(res.download_url).then(r => r.arrayBuffer());
+          }
+          zip.file(res.filename || `compressed_${f.name}`, fileData);
+        }
+
+        compressProgressText.textContent = "Mengemas file-file hasil kompresi ke format ZIP...";
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const zipUrl = URL.createObjectURL(zipBlob);
+        const zipSize = zipBlob.size;
+        const reductionPct = Math.max(0, Math.round(((totalOrig - zipSize) / Math.max(1, totalOrig)) * 100));
+
+        btnStartCompress.disabled = false;
+        compressProgress.style.display = "none";
+        displayCompressResult({
+          success: true,
+          is_zip: true,
+          total_files: compressFiles.length,
+          original_size: totalOrig,
+          compressed_size: zipSize,
+          reduction_pct: reductionPct,
+          target_met: allMet,
+          note: `Berhasil mengompres ${compressFiles.length} file PDF menjadi 1 file ZIP.`,
+          download_url: zipUrl,
+          filename: "compressed_pdfs.zip"
+        });
+      }
     } catch (clientErr) {
       btnStartCompress.disabled = false;
       compressProgress.style.display = "none";
@@ -293,7 +461,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function displayCompressResult(data) {
     compressResult.style.display = "block";
     const statusBadge = document.getElementById("res-status-badge");
-    if (data.target_met) {
+    if (data.is_zip) {
+      statusBadge.className = "result-badge-status badge-success";
+      statusBadge.innerHTML = `<svg class="ui-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg> Batch Kompresi Selesai (ZIP)`;
+    } else if (data.target_met) {
       statusBadge.className = "result-badge-status badge-success";
       statusBadge.innerHTML = `<svg class="ui-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg> Target Tercapai!`;
     } else {
@@ -304,20 +475,42 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("res-orig-size").textContent = formatBytes(data.original_size);
     document.getElementById("res-comp-size").textContent = formatBytes(data.compressed_size);
     document.getElementById("res-saved-pct").textContent = `-${data.reduction_pct}%`;
-    document.getElementById("res-note").textContent = data.note || "Target ukuran berhasil dioptimasi dengan preservasi teks tajam.";
+    document.getElementById("res-note").textContent = data.note || (data.is_zip ? `Semua ${data.total_files} file PDF berhasil dikompresi ke arsip ZIP.` : "Target ukuran berhasil dioptimasi dengan preservasi teks tajam.");
 
     const btnDownload = document.getElementById("res-btn-download");
     btnDownload.href = data.download_url;
     btnDownload.download = data.filename;
+    if (data.is_zip) {
+      btnDownload.innerHTML = `
+        <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Unduh Arsip ZIP (${data.total_files} PDF)
+      `;
+    } else {
+      btnDownload.innerHTML = `
+        <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Unduh PDF Hasil Kompresi
+      `;
+    }
 
     // Auto-trigger instant download on successful compression
-    triggerAutoDownload(data.download_url, data.filename, `Kompresi PDF selesai (${formatBytes(data.compressed_size)}, hemat ${data.reduction_pct}%).`);
+    const msg = data.is_zip
+      ? `Kompresi ${data.total_files} file PDF selesai (${formatBytes(data.compressed_size)}, hemat ${data.reduction_pct}%). File ZIP diunduh otomatis.`
+      : `Kompresi PDF selesai (${formatBytes(data.compressed_size)}, hemat ${data.reduction_pct}%). File PDF diunduh otomatis.`;
+    triggerAutoDownload(data.download_url, data.filename, msg);
 
     compressResult.scrollIntoView({ behavior: "smooth" });
   }
 
   document.getElementById("res-btn-reset").addEventListener("click", () => {
-    compressBtnRemove.click();
+    resetCompressList();
   });
 
   // Client-side PDF Compressor Engine (Adaptive Binary Search Optimizer)
@@ -348,7 +541,8 @@ document.addEventListener("DOMContentLoaded", () => {
           target_met: true,
           note: `Target terpenuhi 100% lossless via Object Streams & pembersihan struktur (${formatBytes(useBytes.byteLength)}).`,
           download_url: URL.createObjectURL(blob),
-          filename: `compressed_${file.name}`
+          filename: `compressed_${file.name}`,
+          bytes: useBytes
         };
       }
     } catch (cleanErr) {}
@@ -435,7 +629,8 @@ document.addEventListener("DOMContentLoaded", () => {
         ? `Ukuran berkurang dari ${formatBytes(origSize)} menjadi ${formatBytes(compSize)} (hemat ${reductionPct}%).`
         : `Kompresi preset '${preset}' selesai dengan penghematan ${reductionPct}%.`,
       download_url: downloadUrl,
-      filename: `compressed_${file.name}`
+      filename: `compressed_${file.name}`,
+      bytes: finalBytes
     };
   }
 
