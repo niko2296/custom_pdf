@@ -102,6 +102,30 @@ document.addEventListener("DOMContentLoaded", () => {
       if (e.target.files && e.target.files.length > 0) {
         onFiles(Array.from(e.target.files));
       }
+      inputEl.value = "";
+    });
+  }
+
+  function makeDropTarget(element, onFiles) {
+    if (!element) return;
+    ["dragenter", "dragover"].forEach(eventName => {
+      element.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        element.classList.add("file-list-drop-active");
+      });
+    });
+    ["dragleave", "drop"].forEach(eventName => {
+      element.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        element.classList.remove("file-list-drop-active");
+      });
+    });
+    element.addEventListener("drop", (e) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        onFiles(Array.from(e.dataTransfer.files));
+      }
     });
   }
 
@@ -133,6 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const compressListHeader = document.getElementById("compress-list-header");
   const compressFileCountBadge = document.getElementById("compress-file-count-badge");
+  const compressBtnAddMore = document.getElementById("compress-btn-add-more");
   const compressBtnResetAll = document.getElementById("compress-btn-reset-all");
   const compressFileList = document.getElementById("compress-file-list");
 
@@ -162,7 +187,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderCompressFileList() {
     if (compressFiles.length === 0) {
-      compressDropzone.style.display = "block";
+      if (compressDropzone) {
+        compressDropzone.classList.remove("dropzone-compact");
+        compressDropzone.style.display = "block";
+      }
       if (compressListHeader) compressListHeader.style.display = "none";
       if (compressFileList) {
         compressFileList.innerHTML = "";
@@ -176,7 +204,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    compressDropzone.style.display = "none";
+    if (compressDropzone) {
+      compressDropzone.classList.add("dropzone-compact");
+      compressDropzone.style.display = "flex";
+    }
     if (compressListHeader) {
       compressListHeader.style.display = "flex";
       if (compressFileCountBadge) {
@@ -263,6 +294,11 @@ document.addEventListener("DOMContentLoaded", () => {
     renderCompressFileList();
   }
 
+  if (compressBtnAddMore) {
+    compressBtnAddMore.addEventListener("click", () => {
+      if (compressFileInput) compressFileInput.click();
+    });
+  }
   if (compressBtnResetAll) {
     compressBtnResetAll.addEventListener("click", resetCompressList);
   }
@@ -286,6 +322,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   setupDropzone(compressDropzone, compressFileInput, (files) => {
+    if (files.length > 0) addCompressFiles(files);
+  });
+  makeDropTarget(compressFileList, (files) => {
     if (files.length > 0) addCompressFiles(files);
   });
 
@@ -642,18 +681,36 @@ document.addEventListener("DOMContentLoaded", () => {
   const mergeFileList = document.getElementById("merge-file-list");
   const mergeListHeader = document.getElementById("merge-list-header");
   const mergeFileCountBadge = document.getElementById("merge-file-count-badge");
+  const btnAddMergeFile = document.getElementById("btn-add-merge-file");
   const btnResetMergeList = document.getElementById("btn-reset-merge-list");
   const btnStartMerge = document.getElementById("btn-start-merge");
   let mergeFiles = [];
 
-  setupDropzone(mergeDropzone, mergeFileInput, (files) => {
+  function addMergeFiles(files) {
+    if (!files || files.length === 0) return;
     files.forEach(f => {
       if (f.name.toLowerCase().endsWith(".pdf")) {
-        mergeFiles.push(f);
+        const exists = mergeFiles.some(mf => mf.name === f.name && mf.size === f.size);
+        if (!exists) {
+          mergeFiles.push(f);
+        }
       }
     });
     renderMergeList();
+  }
+
+  setupDropzone(mergeDropzone, mergeFileInput, (files) => {
+    addMergeFiles(files);
   });
+  makeDropTarget(mergeFileList, (files) => {
+    addMergeFiles(files);
+  });
+
+  if (btnAddMergeFile) {
+    btnAddMergeFile.addEventListener("click", () => {
+      if (mergeFileInput) mergeFileInput.click();
+    });
+  }
 
   if (btnResetMergeList) {
     btnResetMergeList.addEventListener("click", () => {
@@ -683,12 +740,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderMergeList() {
     mergeFileList.innerHTML = "";
     if (mergeFiles.length === 0) {
+      if (mergeDropzone) mergeDropzone.classList.remove("dropzone-compact");
       if (mergeListHeader) mergeListHeader.style.display = "none";
       mergeFileList.innerHTML = '<div style="color:var(--text-muted); font-size:14px; text-align:center; padding:12px;">Belum ada file PDF yang dipilih.</div>';
       btnStartMerge.disabled = true;
       return;
     }
 
+    if (mergeDropzone) mergeDropzone.classList.add("dropzone-compact");
     if (mergeListHeader) {
       mergeListHeader.style.display = "flex";
       if (mergeFileCountBadge) {
@@ -1075,18 +1134,129 @@ document.addEventListener("DOMContentLoaded", () => {
   // Mode B: Images to PDF
   const i2pDropzone = document.getElementById("i2p-dropzone");
   const i2pFileInput = document.getElementById("i2p-file-input");
+  const i2pListHeader = document.getElementById("i2p-list-header");
+  const i2pFileCountBadge = document.getElementById("i2p-file-count-badge");
+  const btnAddI2pFile = document.getElementById("btn-add-i2p-file");
+  const btnResetI2pList = document.getElementById("btn-reset-i2p-list");
+  const i2pFileList = document.getElementById("i2p-file-list");
   const i2pFileCount = document.getElementById("i2p-file-count");
   const btnStartI2p = document.getElementById("btn-start-i2p");
   let i2pFiles = [];
 
-  setupDropzone(i2pDropzone, i2pFileInput, (files) => {
-    i2pFiles = files;
-    if (i2pFiles.length > 0) {
-      i2pFileCount.textContent = `${i2pFiles.length} gambar dipilih`;
-      i2pFileCount.style.display = "block";
-      btnStartI2p.disabled = false;
+  function addI2pFiles(newFiles) {
+    if (!newFiles || newFiles.length === 0) return;
+    Array.from(newFiles).forEach(f => {
+      const isImg = f.type.startsWith("image/") || /\.(jpg|jpeg|png|webp)$/i.test(f.name);
+      if (isImg) {
+        const exists = i2pFiles.some(item => item.name === f.name && item.size === f.size);
+        if (!exists) i2pFiles.push(f);
+      }
+    });
+    renderI2pList();
+  }
+
+  function renderI2pList() {
+    if (i2pFiles.length === 0) {
+      if (i2pDropzone) {
+        i2pDropzone.classList.remove("dropzone-compact");
+        i2pDropzone.style.display = "block";
+      }
+      if (i2pListHeader) i2pListHeader.style.display = "none";
+      if (i2pFileList) {
+        i2pFileList.innerHTML = "";
+        i2pFileList.style.display = "none";
+      }
+      if (i2pFileCount) i2pFileCount.style.display = "none";
+      if (btnStartI2p) {
+        btnStartI2p.disabled = true;
+        btnStartI2p.textContent = "Gabungkan Semua Gambar ke PDF";
+      }
+      if (i2pFileInput) i2pFileInput.value = "";
+      return;
     }
+
+    if (i2pDropzone) {
+      i2pDropzone.classList.add("dropzone-compact");
+      i2pDropzone.style.display = "flex";
+    }
+    if (i2pListHeader) {
+      i2pListHeader.style.display = "flex";
+      if (i2pFileCountBadge) {
+        i2pFileCountBadge.textContent = `${i2pFiles.length} Gambar`;
+      }
+    }
+    if (i2pFileList) {
+      i2pFileList.innerHTML = "";
+      i2pFileList.style.display = "block";
+
+      i2pFiles.forEach((file, index) => {
+        const item = document.createElement("div");
+        item.className = "file-preview";
+        item.style.marginTop = "8px";
+        item.innerHTML = `
+          <div class="file-preview-left">
+            <div class="file-icon">
+              <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </div>
+            <div>
+              <div class="file-name">${index + 1}. ${file.name}</div>
+              <div class="file-size">${formatBytes(file.size)}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-remove-file" title="Hapus gambar" data-idx="${index}">
+            <svg class="ui-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        `;
+
+        item.querySelector(".btn-remove-file").addEventListener("click", (e) => {
+          e.stopPropagation();
+          i2pFiles.splice(index, 1);
+          renderI2pList();
+        });
+
+        i2pFileList.appendChild(item);
+      });
+    }
+
+    if (btnStartI2p) {
+      btnStartI2p.disabled = false;
+      btnStartI2p.innerHTML = `
+        <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        Gabungkan Semua Gambar ke PDF (${i2pFiles.length} Gambar)
+      `;
+    }
+  }
+
+  function resetI2pList() {
+    i2pFiles = [];
+    if (i2pFileInput) i2pFileInput.value = "";
+    renderI2pList();
+  }
+
+  setupDropzone(i2pDropzone, i2pFileInput, (files) => {
+    addI2pFiles(files);
   });
+  makeDropTarget(i2pFileList, (files) => {
+    addI2pFiles(files);
+  });
+  if (btnAddI2pFile) {
+    btnAddI2pFile.addEventListener("click", () => {
+      if (i2pFileInput) i2pFileInput.click();
+    });
+  }
+  if (btnResetI2pList) {
+    btnResetI2pList.addEventListener("click", resetI2pList);
+  }
 
   btnStartI2p.addEventListener("click", async () => {
     if (i2pFiles.length === 0) return;
@@ -1101,8 +1271,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.success) {
           btnStartI2p.disabled = false;
-          btnStartI2p.textContent = "Gabungkan Semua Gambar ke PDF";
-          showSimpleDownload(data.download_url, data.filename, `Berhasil menggabungkan ${data.total_images} gambar ke PDF.`);
+          btnStartI2p.innerHTML = `
+            <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            Gabungkan Semua Gambar ke PDF (${i2pFiles.length} Gambar)
+          `;
+          triggerAutoDownload(data.download_url, data.filename, `Berhasil menggabungkan ${data.total_images} gambar ke PDF.`);
           return;
         }
       }
@@ -1122,11 +1298,23 @@ document.addEventListener("DOMContentLoaded", () => {
       const outBytes = await doc.save();
       const blob = new Blob([outBytes], { type: "application/pdf" });
       btnStartI2p.disabled = false;
-      btnStartI2p.textContent = "Gabungkan Semua Gambar ke PDF";
-      showSimpleDownload(URL.createObjectURL(blob), "converted_images.pdf", `Berhasil menggabungkan ${i2pFiles.length} gambar ke PDF.`);
+      btnStartI2p.innerHTML = `
+        <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        Gabungkan Semua Gambar ke PDF (${i2pFiles.length} Gambar)
+      `;
+      triggerAutoDownload(URL.createObjectURL(blob), "converted_images.pdf", `Berhasil menggabungkan ${i2pFiles.length} gambar ke PDF.`);
     } catch (err) {
       btnStartI2p.disabled = false;
-      btnStartI2p.textContent = "Gabungkan Semua Gambar ke PDF";
+      btnStartI2p.innerHTML = `
+        <svg class="ui-icon icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        Gabungkan Semua Gambar ke PDF
+      `;
       alert("Error konversi: " + err.message);
     }
   });

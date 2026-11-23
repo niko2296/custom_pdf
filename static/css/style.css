@@ -563,10 +563,85 @@ body.pro-editor-dark-mode #auto-download-toast {
   transform: translateY(0);
 }
 
-#compress-file-list, #merge-file-list {
+.btn-add-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  border-radius: var(--radius-sm, 6px);
+  padding: 5px 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.btn-add-list:hover {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: #2563eb;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-add-list:active {
+  transform: translateY(0);
+}
+
+#compress-file-list, #merge-file-list, #i2p-file-list {
   max-height: 380px;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+/* Compact Dropzone Variant When Files Already Present */
+.dropzone.dropzone-compact {
+  padding: 14px 20px;
+  min-height: auto;
+  margin-bottom: 14px;
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-width: 1.5px;
+}
+
+.dropzone.dropzone-compact .dropzone-icon-wrap {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.dropzone.dropzone-compact .dropzone-title {
+  font-size: 13.5px;
+  margin-bottom: 0;
+  font-weight: 600;
+}
+
+.dropzone.dropzone-compact .dropzone-subtitle {
+  display: none;
+}
+
+.dropzone.dropzone-compact .btn-select-file {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  margin-left: 4px;
+}
+
+.file-list-drop-active {
+  outline: 2px dashed var(--color-primary);
+  outline-offset: 4px;
+  border-radius: var(--radius-md);
+  background: rgba(229, 50, 45, 0.04);
+}
+
+body.pro-editor-dark-mode .file-list-drop-active {
+  outline-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
 }
 
 /* File Preview Strip */
@@ -2895,6 +2970,18 @@ body.pro-editor-dark-mode .btn-reset-list {
 body.pro-editor-dark-mode .btn-reset-list:hover {
   background: rgba(239, 68, 68, 0.28) !important;
   border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+body.pro-editor-dark-mode .btn-add-list {
+  background: rgba(56, 189, 248, 0.14) !important;
+  border-color: rgba(56, 189, 248, 0.38) !important;
+  color: #7dd3fc !important;
+}
+
+body.pro-editor-dark-mode .btn-add-list:hover {
+  background: rgba(56, 189, 248, 0.28) !important;
+  border-color: #38bdf8 !important;
   color: #ffffff !important;
 }
 
